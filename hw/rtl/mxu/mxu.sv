@@ -49,7 +49,6 @@ module mxu #(
     input  logic                     clk,
     input  logic                     rst,
     input  logic                     dataflow_os,
-    input  logic [31:0]              mode_word,
 
     input  logic                     b_valid       [DIM],
     input  logic [B_WIDTH-1:0]       b_data        [DIM],

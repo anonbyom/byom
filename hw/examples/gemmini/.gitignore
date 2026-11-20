@@ -1,0 +1,8 @@
+# clones and the generator's raw output (generate.py)
+build/
+# sbt's
+chisel/target/
+chisel/project/target/
+chisel/project/project/
+units/
+meshes/

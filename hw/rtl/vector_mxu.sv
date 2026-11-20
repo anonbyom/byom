@@ -72,10 +72,10 @@ module vector_mxu #(
     logic                     command_preload;
     logic                     command_bank;
     logic [1:0]               command_mode;
-    logic [1:0]               command_tile;
+    logic [1:0]               matmul_tile;
     logic [COMMAND_W-1:0]     command_level;
     logic                     scale_valid;
-    logic [SCALE_A_WIDTH-1:0] scale_a;
+    logic [SCALE_A_WIDTH-1:0] matmul_scale_a;
     logic [POSITION_W-1:0]    offset_q;
     logic [POSITION_W:0]      next_offset;
     logic                     beat_ready;
@@ -101,7 +101,7 @@ module vector_mxu #(
         .w_data  ({matmul_cmd_tile, matmul_cmd_mode, matmul_cmd_bank, matmul_cmd_preload}),
         .w_rdy   (),
         .r_en    (command_pop),
-        .r_data  ({command_tile, command_mode, command_bank, command_preload}),
+        .r_data  ({matmul_tile, command_mode, command_bank, command_preload}),
         .r_valid (command_valid),
         .level   (command_level)
     );
@@ -156,9 +156,9 @@ module vector_mxu #(
             .level   ()
         );
         if (ROWS % N_A == 0) begin : gen_aligned
-            assign head_pop    = command_pop;
-            assign scale_valid = head_valid;
-            assign scale_a     = head[SCALE_WIDTH*offset_q +: SCALE_A_WIDTH];
+            assign head_pop       = command_pop;
+            assign scale_valid    = head_valid;
+            assign matmul_scale_a = head[SCALE_WIDTH*offset_q +: SCALE_A_WIDTH];
         end else begin : gen_straddle
             logic [SCALE_WIDTH*ROWS-1:0] current_q;
             logic                        current_valid_q;
@@ -174,14 +174,14 @@ module vector_mxu #(
             for (genvar j = 0; j < N_A; j++) begin : gen_row
                 logic [POSITION_W:0] index;
                 assign index = (POSITION_W+1)'(offset_q) + (POSITION_W+1)'(j);
-                assign scale_a[SCALE_WIDTH*j +: SCALE_WIDTH] = index < (POSITION_W+1)'(ROWS)
+                assign matmul_scale_a[SCALE_WIDTH*j +: SCALE_WIDTH] = index < (POSITION_W+1)'(ROWS)
                     ? current_q[SCALE_WIDTH*POSITION_W'(index) +: SCALE_WIDTH]
                     : head[SCALE_WIDTH*POSITION_W'(index) +: SCALE_WIDTH];
             end
         end
     end else begin : gen_no_scale
-        assign scale_valid = 1'b1;
-        assign scale_a     = '0;
+        assign scale_valid    = 1'b1;
+        assign matmul_scale_a = '0;
     end
 
     for (genvar lane = 0; lane < LANES; lane++) begin : gen_lane
@@ -284,26 +284,12 @@ module vector_mxu #(
         .DATAFLOW(DATAFLOW),
         .BANK_FREE_AT_LOAD(BANK_FREE_AT_LOAD)
     ) u_mxu (
-        .clk,
-        .rst,
-        .dataflow_os,
-        .mode_word,
+        .*,
         .b_valid        (push_valid),
-        .b_data,
         .b_bank         (push_bank),
-        .b_freed,
-        .b_freed_bank,
         .matmul_valid   (beat_ready),
-        .matmul_ready,
         .matmul_preload (command_preload && offset_q == '0),
         .matmul_bank    (command_bank),
-        .matmul_mode    (command_mode),
-        .matmul_tile    (command_tile),
-        .matmul_scale_a (scale_a),
-        .a_valid,
-        .a_ready,
-        .a_data,
-        .psum_valid,
-        .psum_data
+        .matmul_mode    (command_mode)
     );
 endmodule : vector_mxu
