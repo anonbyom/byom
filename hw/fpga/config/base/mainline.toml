@@ -1,0 +1,125 @@
+# The base. 
+# An image (images/<image>.toml) names a matrix unit (units/<unit>.toml) and overrides params, usually MXU_COUNT.
+# tools/byom/integrate.py <image> writes the build file variants/<image>.toml.
+# "@unit" marks where the unit's files go.
+top = "tpu_kernel"
+part = "xcu55c-fsvh2892-2L-e"
+constraints = ["fpga/scripts/floorplan/boundaries.xdc"]
+defines = ["VALU2"]
+sources = [
+    "rtl/common/axi/axi_register_slice.sv",
+    "rtl/common/axi/axi_address_offset.sv",
+    "rtl/isa_pkg.sv",
+    "rtl/tpu_perf_pkg.sv",
+    "rtl/common/axi/axi_pkg.sv",
+    "rtl/common/fifo.sv",
+    "rtl/common/credit_counter.sv",
+    "rtl/common/reset_register.sv",
+    "rtl/common/axi/axi_burst_serializer.sv",
+    "rtl/common/axi/axi_reader.sv",
+    "rtl/common/burst_tracker.sv",
+    "rtl/common/axi/axi_writer.sv",
+    "rtl/dma/dma_reader.sv",
+    "rtl/dma/dma_writer.sv",
+    "rtl/dma/dma_channel.sv",
+    "rtl/common/register_file.sv",
+    "rtl/scalar/bundle_decode.sv",
+    "rtl/scalar/scalar_execute.sv",
+    "rtl/scalar/scalar_fetch.sv",
+    "rtl/scalar/scalar_control.sv",
+    "rtl/scalar/scalar_pipeline.sv",
+    "rtl/scalar/scalar_dma_control.sv",
+    "rtl/scalar/scalar_unit.sv",
+    "rtl/common/barrel_rotator.sv",
+    "rtl/common/shifter.sv",
+    "rtl/common/shifter_taps.sv",
+    "rtl/common/mem.sv",
+    "rtl/common/multiport_register_file.sv",
+    "rtl/vector/valu_forwarding.sv",
+    "rtl/arith/bf16_compare.sv",
+    "rtl/vector/valu_execute.sv",
+    "rtl/arith/bf16_max_to_e8m0.sv",
+    "rtl/arith/bf16_adder.sv",
+    "rtl/arith/fp32_add.sv",
+    "rtl/arith/fp32_to_bf16.sv",
+    "rtl/arith/bf16_mul_ftz.sv",
+    "rtl/arith/bf16_log2.sv",
+    "rtl/arith/bf16_pow2.sv",
+    "rtl/arith/bf16_reciprocal.sv",
+    "rtl/arith/bf16_tanh.sv",
+    "rtl/vector/lane_pack.sv",
+    "rtl/vector/valu_bf16.sv",
+    "rtl/vector/lane_eup.sv",
+    "rtl/vector/eup_functions.sv",
+    "rtl/vector/valu.sv",
+    "rtl/vector/lane_serializer.sv",
+    "rtl/vector/lane_memory.sv",
+    "rtl/vector/lane_vex.sv",
+    "rtl/vector/lane_quantize.sv",
+    "rtl/vector/lane_vr.sv",
+    "rtl/vector/vlane.sv",
+    "rtl/dma/dma_command_transport.sv",
+    "rtl/dma/dma_unit.sv",
+    "rtl/dma/dma_scalar_adapter.sv",
+    "rtl/common/unbuffered_serializer.sv",
+    "rtl/common/deserializer.sv",
+    "rtl/dma/dma_scalar_read_control.sv",
+    "rtl/dma/dma_scalar_read.sv",
+    "rtl/dma/dma_scalar_write_control.sv",
+    "rtl/common/injection_chain.sv",
+    "rtl/dma/dma_scalar_write.sv",
+    "rtl/vector/lane_dma.sv",
+    "rtl/vector/vector_dma_response.sv",
+    "rtl/vector/vector_issue.sv",
+    "rtl/vector/vector_dma_channel.sv",
+    "rtl/vector/vector_unit.sv",
+    "rtl/arith/bf16_absmax.sv",
+    "rtl/arith/bf16_absmax_reduction.sv",
+    "rtl/arith/bf16_scale_from_max.sv",
+    "rtl/arith/bf16_block_scale.sv",
+    "rtl/arith/bf16_to_mxfp4.sv",
+    "rtl/arith/bf16_block_quantize.sv",
+    "@unit",
+    "rtl/mxu_feed.sv",
+    "rtl/vector_mxu.sv",
+    "rtl/vector/transpose.sv",
+    "rtl/vector/xlu_reduce.sv",
+    "rtl/vector/xlu_quantize.sv",
+    "rtl/vector/xlu.sv",
+    "rtl/tpu_perf.sv",
+    "rtl/tpu.sv",
+    "fpga/axi_macros.svh",
+    "rtl/tpu_control.sv",
+    "fpga/tpu_kernel.sv",
+]
+
+[parameters]
+C_M_AXI_GMEM_DATA_WIDTH = 256
+LANES = 32
+SUBLANES = 4
+VREG_COUNT = 32
+VMEM_DEPTH = 131072
+IMEM_DEPTH = 32768
+SMEM_DEPTH = 4096
+MXU_ENABLE = true
+MXU_SLR_CROSSING = 3
+MXU_ACC_ROWS = 1024
+XLU_QUANTIZE = false
+VMEM_URAM_OREG = false
+PERF_COUNTERS = true
+XLU_REDUCE_TREES = 2
+EUP_WIDTH = 1
+MXU_BANK_FREE_AT_LOAD = true
+
+[hooks]
+pre_place = "fpga/scripts/floorplan/pre_place.tcl"
+post_place = "fpga/scripts/floorplan/post_place.tcl"
+
+[floorplan]
+xlu_slr = 2               # SLR of the XLU (1 or 2)
+uram_read_columns = 2     # CLB columns on each side of a lane's URAMs that hold its URAM read registers (0: anywhere)
+dsp_bands = false         # two MXUs of DSP cascade chains: each in its half of SLR2's DSP columns, in 32-row bands
+
+[directives]
+place = "AltSpreadLogic_high"
+post_route_phys_opt = "AggressiveExplore"

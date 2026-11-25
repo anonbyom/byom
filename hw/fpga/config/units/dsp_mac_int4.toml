@@ -1,0 +1,15 @@
+# BYOM's DSP48E2 PE (rtl/pe/dsp_mac.sv), plain int4: exact integer sums.
+sources = ["rtl/pe/dsp_mac.sv"]
+
+[shape]
+n_a = 2                   # rows per cycle (packed 16 bits apart in A)
+
+[operands]
+w_twos = true             # two's complement codes, symmetric: -8 saturates to -7 (int_code)
+psum_w = 13               # 32 products of at most 49
+
+[socket]
+tag_fifo_depth = 128      # as dsp_mac_mxfp4
+
+[floorplan]
+dsp_bands = true          # 32 DSP cascade chains an MXU

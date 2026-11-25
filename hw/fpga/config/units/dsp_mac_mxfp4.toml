@@ -1,0 +1,17 @@
+# BYOM's DSP48E2 PE (rtl/pe/dsp_mac.sv), MXFP4: E2M1 codes, E8M0 scales, FP32 accumulation.
+sources = ["rtl/pe/dsp_mac.sv"]
+
+[shape]
+n_a = 2
+
+[operands]
+e2m1 = true
+mx = true
+acc_fp32 = true
+psum_w = 14
+
+[socket]
+tag_fifo_depth = 128      # MATMUL beats in flight
+
+[floorplan]
+dsp_bands = true          # 32 DSP cascade chains an MXU
