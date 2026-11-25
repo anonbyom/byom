@@ -1,0 +1,7 @@
+# The base with two MXUs of BYOM's DSP PE, plain int4.
+base = "mainline"
+unit = "dsp_mac_int4"
+clock_mhz = 330
+
+[parameters]
+MXU_COUNT = 2

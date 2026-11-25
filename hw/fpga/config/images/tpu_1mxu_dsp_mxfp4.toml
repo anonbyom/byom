@@ -1,0 +1,8 @@
+# The base with one MXU of BYOM's DSP PE, MXFP4 (microscaling, with the XLU quantizer).
+base = "mainline"
+unit = "dsp_mac_mxfp4"
+clock_mhz = 330
+
+[parameters]
+MXU_COUNT = 1
+XLU_QUANTIZE = true

@@ -1,0 +1,8 @@
+# The base with two MXUs of BYOM's DSP PE, plain int4, and one VALU (no VALU2: 128-bit bundles).
+base = "mainline"
+unit = "dsp_mac_int4"
+undefines = ["VALU2"]
+clock_mhz = 350
+
+[parameters]
+MXU_COUNT = 2

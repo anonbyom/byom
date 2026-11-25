@@ -1,0 +1,11 @@
+# The base TPU without a matrix unit.
+base = "mainline"
+unit = "none"
+clock_mhz = 330
+
+[parameters]
+MXU_COUNT = 1
+MXU_E2M1 = true
+MXU_MX = true
+MXU_N_W = 3
+MXU_N_A = 3
