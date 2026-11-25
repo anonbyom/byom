@@ -4,3 +4,5 @@ build/
 obj_dir/
 fpga/config/variants/
 fpga/config/sidecars/
+fpga.toml
+fpga/config/images/tpu_2mxu_dsp_mxfp4_1valu.toml
