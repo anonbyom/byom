@@ -141,5 +141,6 @@ if __name__ == "__main__":
     outputs = {CONFIG / "variants" / f"{image}.toml": render(image, config),
         CONFIG / "sidecars" / f"{image}.json": json.dumps(describe(image, config), indent=1, sort_keys=True) + "\n"}
     for target, text in outputs.items():
+        target.parent.mkdir(exist_ok=True)
         target.write_text(text)
         print("wrote", target.relative_to(TREE))
