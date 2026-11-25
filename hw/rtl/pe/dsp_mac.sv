@@ -13,7 +13,7 @@ package pe_shape;
     localparam int unsigned ENCODE_LATENCY = 0;
 endpackage : pe_shape
 
-// One DSP48E2: P = A * AD (+ PCIN). b_load shifts the next tile's b through B1/B2 (BCIN/BCOUT);
+// One DSP48E2: P = A * AD (+ PCIN). b_load shifts the next tile's b through B1/B2 (BCIN/BCOUT)
 // b_update copies B1 into AD, the b in use.
 module pe #(
     parameter bit          USE_BCIN  = 1'b0,

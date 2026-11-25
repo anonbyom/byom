@@ -1,4 +1,5 @@
-// One lane's PUSH/MATMUL words for the MXUs, per engine: PUSH as CODE_BITS weights, MATMUL as beats or whole words.
+// One lane's PUSH/MATMUL words for the MXUs, per engine: PUSH as CODE_BITS weights,
+// MATMUL as beats or whole words.
 module mxu_feed #(
     parameter int unsigned SUBLANES           = 4,
     parameter int unsigned ELEMENT_WIDTH      = isa_pkg::VECTOR_ELEMENT_WIDTH,
@@ -32,6 +33,7 @@ module mxu_feed #(
 );
     localparam int unsigned PER_ELEMENT = ELEMENT_WIDTH / CODE_BITS;
     localparam int unsigned SLOTS       = SUBLANES * PER_ELEMENT;
+    localparam bit          TARGET_PUSH_NATURAL = PUSH_NATURAL;   // the description's push_natural
 
     logic [ELEMENT_WIDTH-1:0]          words      [SUBLANES];
     logic [ELEMENT_WIDTH-1:0]          push_words [SUBLANES];

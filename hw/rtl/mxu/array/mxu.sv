@@ -19,6 +19,7 @@ module mxu #(
     parameter bit           TILE_MODES        = 1'b0,
     parameter int unsigned  DATAFLOW          = 1,
     parameter bit           BANK_FREE_AT_LOAD = 1'b0,
+    parameter int unsigned  A_WORD_ROWS       = N_A,     // a MATMUL word's rows (vector_mxu's)
     localparam int unsigned DIM               = LANES,
     localparam int unsigned GROUPS            = (DIM + N_W - 1) / N_W,
     localparam int unsigned SPAN              = GROUPS * N_W,
@@ -234,20 +235,26 @@ module mxu #(
         assign load_hold = 1'b0;
     end
 
-    localparam int unsigned SOCKET_SCHEDULE = 1;
-    localparam bit          SOCKET_INT_SUMS = !FLOAT_OUT && !SUM_OWN;
-    localparam int unsigned SOCKET_OUTPUT   = N_W - 1 + (ACC_ENABLE ? 4 + 1 + (SOCKET_INT_SUMS ? 1 : 0) + 1
-                                                                         : SOCKET_INT_SUMS ? 2 : 1);
-    localparam int unsigned SOCKET_RESULT_DELAY    = SOCKET_SCHEDULE + RESULT_DELAY + SOCKET_OUTPUT;
-    localparam int unsigned SOCKET_FEED_ROWS       = DIM;
-    localparam bit          SOCKET_FEED_AT_COMMAND = 1'b1;
-    localparam int unsigned SOCKET_PRELOAD_LAUNCH  = DIM;
-    localparam bit          SOCKET_WEIGHT_STREAM   = 1'b1;
-    localparam int unsigned SOCKET_WEIGHT_READY    = 2;
-    localparam bit          SOCKET_FREE_AT_LOAD    = BANK_FREE_AT_LOAD;
-    localparam int unsigned SOCKET_BANK_FREE       = DIM;
-    localparam int unsigned SOCKET_TILE_SPACING    = DIM + LOAD_HOLD;
-    localparam int unsigned SOCKET_IN_FLIGHT_BEATS = A_FIFO_DEPTH < TAG_FIFO_DEPTH ? A_FIFO_DEPTH : TAG_FIFO_DEPTH;
+    localparam bit          INT_SUMS            = !FLOAT_OUT && !SUM_OWN;
+    localparam int unsigned OUTPUT_DELAY        = N_W - 1 + (ACC_ENABLE ? 4 + 1 + (INT_SUMS ? 1 : 0) + 1 : INT_SUMS ? 2 : 1);
+    localparam int unsigned SOCKET_RESULT_DELAY = 1 + RESULT_DELAY + OUTPUT_DELAY;    // a cycle to schedule the row
+    localparam bit          SOCKET_FREE_AT_LOAD = BANK_FREE_AT_LOAD;
+    localparam int unsigned SOCKET_TILE_SPACING = DIM + LOAD_HOLD;
+    localparam int unsigned SOCKET_IN_FLIGHT    = (A_FIFO_DEPTH < TAG_FIFO_DEPTH ? A_FIFO_DEPTH : TAG_FIFO_DEPTH) /
+                                                  ((A_WORD_ROWS + N_A - 1) / N_A);
+    localparam int unsigned SOCKET_ADD_STAGES   = pe_shape::ACC_STAGES;
+    localparam string       TARGET_MXU_OPERANDS = "bf16";
+    localparam string       ARITH_KIND          = SUM_FLOAT ? "float" : "int";
+    localparam int unsigned ARITH_N_W           = N_W;
+    localparam int unsigned ARITH_N_A           = N_A;
+    if (SUM_FLOAT) begin : gen_float_arith
+        localparam string ARITH_K_TILES = ACC_FP32 ? "fp32_accumulator" : "add_impl";
+    end else begin : gen_int_arith
+        localparam int unsigned ARITH_W_BITS     = W_BITS < CODE_BITS ? W_BITS : CODE_BITS;
+        localparam int unsigned ARITH_A_BITS     = A_BITS;
+        localparam bit          ARITH_W_FULL_NEG = W_CODES > 1 && W_TWOS || W_BITS > CODE_BITS;
+        localparam bit          ARITH_PACKED     = CODE_BITS == 4;
+    end
 
     for (genvar col = 0; col < DIM; col++) begin : gen_b
         logic read;
@@ -272,7 +279,7 @@ module mxu #(
             assign weight_code  = b_data[col][W_BITS-1:0];
             assign weight_valid = b_valid[col];
         end else begin : gen_int
-            int4_int_code #(
+            int_code #(
                 .BITS(W_BITS),
                 .TWOS(W_TWOS),
                 .IN_BITS(CODE_BITS)
@@ -417,7 +424,7 @@ module mxu #(
             end else if (SUM_FLOAT || ENCODE) begin : gen_raw
                 assign codes[A_BITS*j +: A_BITS] = a_data[row][CODE_BITS*j +: CODE_BITS];
             end else begin : gen_int
-                int4_int_code #(
+                int_code #(
                     .BITS(A_BITS),
                     .TWOS(1'b1),
                     .IN_BITS(CODE_BITS)

@@ -1,5 +1,5 @@
-// The matrix unit's socket: MATMUL commands and activation words in, N_A rows a beat to the unit, results to the sublanes.
-// vector_issue counts the slots, so no input has a ready.
+// The matrix unit's socket: MATMUL commands and activation words in, N_A rows a beat to the unit,
+// results to the sublanes. vector_issue counts the slots, so no input has a ready.
 module vector_mxu #(
     parameter int unsigned LANES             = 32,
     parameter int unsigned SUBLANES          = 4,
@@ -263,6 +263,37 @@ module vector_mxu #(
         end
     end
 
+    localparam string       SOCKET_LEVEL                   = "pe";
+    localparam string       SOCKET_FAMILY                  = "pe";
+    localparam string       SOCKET_DATAFLOW                = DATAFLOW == 3 ? "both" : DATAFLOW == 2 ? "os" : "ws";
+    localparam int unsigned SOCKET_DIM                     = LANES;
+    localparam int unsigned SOCKET_TILE_ROWS               = LANES;
+    localparam int unsigned SOCKET_N_W                     = N_W;
+    localparam int unsigned SOCKET_N_A                     = N_A;
+    localparam int unsigned SOCKET_ROWS_PER_RESULT         = N_A;
+    localparam int unsigned SOCKET_W_CODES                 = W_CODES;
+    localparam int unsigned SOCKET_TILE                    = 1;
+    localparam int unsigned SOCKET_ADD_STAGES              = 1;
+    localparam int unsigned SOCKET_SCHEDULE                = 1;
+    localparam int unsigned SOCKET_FEED_ROWS               = LANES;
+    localparam bit          SOCKET_FEED_AT_COMMAND         = 1'b1;
+    localparam int unsigned SOCKET_FEED_START              = 0;
+    localparam int unsigned SOCKET_PRELOAD_LAUNCH          = LANES;
+    localparam bit          SOCKET_WEIGHT_STREAM           = 1'b1;
+    localparam int unsigned SOCKET_WEIGHT_READY            = 2;
+    localparam bit          SOCKET_FREE_AT_LOAD            = 1'b0;
+    localparam int unsigned SOCKET_BANK_FREE               = LANES;
+    localparam int unsigned SOCKET_TILE_SPACING            = LANES;
+    localparam int unsigned SOCKET_MATMUL_FREE             = 0;
+    localparam int unsigned SOCKET_OS_BEAT                 = 0;
+    localparam int unsigned SOCKET_OS_PAIR_CYCLES          = ROWS;
+    localparam int unsigned SOCKET_OS_FREE                 = 0;
+    localparam int unsigned SOCKET_OS_DRAIN_NEXT           = 1;
+    localparam int unsigned SOCKET_OS_DRAIN_FLUSH          = 1;
+    localparam int unsigned SOCKET_OS_DRAIN_ROWS_PER_CYCLE = 1;
+
+    localparam bit          TARGET_MXU_ACC_FP32            = ACC_FP32;
+
     mxu #(
         .LANES(LANES),
         .TAG_FIFO_DEPTH(TAG_FIFO_DEPTH),
@@ -282,7 +313,8 @@ module vector_mxu #(
         .W_CODES(W_CODES),
         .TILE_MODES(TILE_MODES),
         .DATAFLOW(DATAFLOW),
-        .BANK_FREE_AT_LOAD(BANK_FREE_AT_LOAD)
+        .BANK_FREE_AT_LOAD(BANK_FREE_AT_LOAD),
+        .A_WORD_ROWS(A_WORD_ROWS)
     ) u_mxu (
         .*,
         .b_valid        (push_valid),
@@ -290,6 +322,12 @@ module vector_mxu #(
         .matmul_valid   (beat_ready),
         .matmul_preload (command_preload && offset_q == '0),
         .matmul_bank    (command_bank),
-        .matmul_mode    (command_mode)
+        .matmul_mode    (command_mode),
+        .b_freed        (b_freed),
+        .b_freed_bank   (b_freed_bank),
+        .matmul_ready   (matmul_ready),
+        .a_ready        (a_ready),
+        .psum_valid     (psum_valid),
+        .psum_data      (psum_data)
     );
 endmodule : vector_mxu

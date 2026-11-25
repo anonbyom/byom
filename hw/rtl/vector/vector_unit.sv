@@ -116,6 +116,14 @@ module vector_unit #(
 
     localparam int unsigned READ_PORTS = VALU2 ? 6 : 4;
 
+    localparam int unsigned SHELL_PUSH_QUEUE       = PUSH_QUEUE_DEPTH;
+    localparam int unsigned SHELL_POP_QUEUE        = POP_QUEUE_DEPTH;
+    localparam int unsigned SHELL_MATMUL_SLOTS     = MXU_MATMUL_SLOTS;
+    localparam int unsigned SHELL_PUSH_SLOTS       = MXU_PUSH_SLOTS;
+    localparam int unsigned SHELL_POPS_PER_MATMUL  = POPS_PER_MATMUL;
+    localparam int unsigned SHELL_POPS_PER_BLOCK   = POPS_PER_BLOCK;
+    localparam int unsigned TARGET_POP_QUEUE_DEPTH = POP_QUEUE_DEPTH;
+
     typedef struct packed {
         logic                   write;
         logic [DMA_ADDR_W-1:0]  address;

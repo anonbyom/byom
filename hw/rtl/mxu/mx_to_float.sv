@@ -1,4 +1,4 @@
-// dot * 2^(scale_a + scale_b - BIAS), rounded once to binary32 or BF16; a scale of 0xff is NaN. 4 cycles.
+// dot * 2^(scale_a + scale_b - BIAS), rounded once to binary32 or BF16, a scale of 0xff is NaN. 4 cycles.
 module mx_to_float #(
     parameter int unsigned  DOT_WIDTH   = 14,
     parameter int unsigned  BIAS        = 256,
@@ -13,6 +13,9 @@ module mx_to_float #(
     input  logic [SCALE_WIDTH-1:0]       scale_b,
     output logic [OUT_WIDTH-1:0]         value
 );
+    localparam bit    TARGET_MXU_FP32_PRODUCTS = FP32;     // the description's mxu_fp32_products
+    localparam string ARITH_MX_SCALES          = "e8m0";
+
     logic signed [E_WIDTH-1:0] exponent;
     logic                      is_zero;
     logic                      is_nan;

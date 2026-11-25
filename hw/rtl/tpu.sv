@@ -23,12 +23,12 @@ module tpu #(
     parameter int MXU_PUSH_QUEUE_DEPTH          = 8,
     parameter int MXU_MATMUL_QUEUE_DEPTH        = 8,
     parameter int unsigned MXU_CODE_BITS        = 4,
-    parameter bit MXU_E2M1                      = 1'b1,
-    parameter bit MXU_MX                        = 1'b1,
+    parameter bit MXU_E2M1                      = 1'b0,
+    parameter bit MXU_MX                        = 1'b0,
     parameter int unsigned MXU_ACC_ROWS         = 1024,
     parameter bit MXU_ACC_FP32                  = 1'b0,
-    parameter int unsigned MXU_N_W              = 3,
-    parameter int unsigned MXU_N_A              = 3,
+    parameter int unsigned MXU_N_W              = 1,
+    parameter int unsigned MXU_N_A              = 1,
     parameter int unsigned MXU_W_BITS           = 4,
     parameter int unsigned MXU_A_BITS           = 4,
     parameter int unsigned MXU_PROD_W           = 8,
@@ -157,6 +157,8 @@ module tpu #(
         $fatal(1, "tpu: a unit with both dataflows takes its dataflow from mxu_mode: set MXU_MODE_WORD");
     end
     if (MXU_MODE_ARG) begin : gen_mode_arg
+        localparam string       ARITH_MODE_WORD  = "mxu_mode";
+        localparam int unsigned ARITH_MODE_RESET = MXU_MODE_RESET;
         shifter #(
             .WIDTH(32),
             .LENGTH(2)
@@ -408,7 +410,6 @@ module tpu #(
             assign input_mask[p] = channel_local_write_valid[c][p];
             assign channel_local_write_ready[c][p] = input_ready;
             if (p == 0) begin : gen_scalar_buffer
-                // A one-entry buffer with a registered ready (half rate is enough for SMEM/IMEM loads).
                 logic [AXI_DATA_W-1:0] scalar_data_q;
                 assign output_ready[p] = output_mask[p] && !scalar_full_q;
                 assign local_write_valid[p][c] = scalar_full_q;
@@ -440,7 +441,6 @@ module tpu #(
         .LOCAL_WRITE_PORTS(LOCAL_WRITE_PORTS),
         .LOCAL_READ_PORTS(LOCAL_READ_PORTS),
         .FIFO_DEPTH(FIFO_DEPTH),
-        // Port 0 (SMEM/IMEM) visits the channels in a fixed order.
         .SERIALIZED_WRITE_PORTS(LOCAL_WRITE_PORTS'(1)),
         .SERIALIZED_READ_PORTS(LOCAL_READ_PORTS'(1)),
         .LOCAL_DEPTH(MAX_DMA_WORDS)
@@ -628,7 +628,6 @@ module tpu #(
         end
     end
 
-    // XLU in SLR2: the floorplan scripts match gen_transpose's blocks.
     if (1) begin : gen_transpose
         logic input_valid [LANES];
         logic [SUBLANES*VECTOR_ELEMENT_WIDTH-1:0] input_data [LANES];
@@ -760,7 +759,6 @@ module tpu #(
         end
     end
 
-    // Each lane's PUSH/MATMUL words cross to the MXUs' SLR, mxu_feed serializes them there.
     for (genvar lane = 0; lane < LANES; lane++) begin : gen_feed
         localparam int unsigned FEED_W = 8 + 3 + $bits(mxu_engine_id_t) + SUBLANES*VECTOR_ELEMENT_WIDTH;
         logic [FEED_W-1:0] word [3];
@@ -820,29 +818,44 @@ module tpu #(
         );
     end
 
-    // shell timing for engine 0, lane 0, in cycles (read by tools/byom/integrate.py).
     localparam int unsigned SHELL_VEX_OUT         = 3;
     localparam int unsigned SHELL_FEED_CROSSING   = MXU_SLR_CROSSING != 0 ? 2 : 0;
     localparam int unsigned SHELL_ENGINE_CROSSING = MXU_SLR_CROSSING[0] ? 2 : 0;
     localparam int unsigned SHELL_PUSH_FEED       = SHELL_VEX_OUT + SHELL_FEED_CROSSING + 2;
     localparam int unsigned SHELL_PUSH_ROW_CYCLES = 1;
     localparam int unsigned SHELL_A_WORD_ROWS     = MXU_BEATS ? MXU_BEAT_BITS / MXU_CODE_BITS : MXU_WORD_ROWS;
+    localparam int unsigned SHELL_WORD_ROWS       = MXU_WORD_ROWS;
     localparam int unsigned SHELL_MATMUL_WORD     = SHELL_VEX_OUT + SHELL_FEED_CROSSING + (MXU_BEATS ? 2 : 0) + 2 +
-                                                    (SHELL_A_WORD_ROWS != MXU_N_A ? 1 : 0);
-    // MX: vector_mxu releases a MATMUL / PRELOAD command once the row scales of its word are in (gen_scale). Row r's
-    // scale comes on lane r with the word, a cycle a lane after lane 0's, so the last one is there MXU_WORD_ROWS - 1
-    // cycles after lane 0's word.
+        (SHELL_A_WORD_ROWS != MXU_N_A ? 1 : 0);
     localparam int unsigned MX_SCALES_IN          = MXU_MX ? SHELL_MATMUL_WORD + MXU_WORD_ROWS - 1 : 0;
     localparam int unsigned SHELL_MATMUL_COMMAND  = MX_SCALES_IN > 4 + SHELL_ENGINE_CROSSING ? MX_SCALES_IN
                                                                                              : 4 + SHELL_ENGINE_CROSSING;
-    // The unit starts a MATMUL's feed with its word, or, when the command comes after the word (MX), the cycle after it
-    // takes the command (mxu.sv; Verilator, 4d11: command 24, first row scheduled from 25).
     localparam int unsigned SHELL_MATMUL_FEED     = SHELL_MATMUL_WORD > SHELL_MATMUL_COMMAND ? SHELL_MATMUL_WORD
                                                                                              : SHELL_MATMUL_COMMAND + 1;
     localparam int unsigned SHELL_RESULT_IN       = SHELL_ENGINE_CROSSING;
     localparam int unsigned SHELL_RESULT_COUNT    = 1 + SHELL_RETURN_STAGES;
     localparam int unsigned SHELL_CREDIT_RETURN   = SHELL_ENGINE_CROSSING + SHELL_RETURN_STAGES;
     localparam int unsigned SHELL_VLD_READY       = 3 + int'(VMEM_URAM_OREG);
+
+    localparam int unsigned TARGET_LANES                   = LANES;
+    localparam int unsigned TARGET_VMEM_ROWS               = VMEM_DEPTH;
+    localparam int unsigned TARGET_IMEM_BUNDLES            = IMEM_DEPTH;
+    localparam int unsigned TARGET_MXU_COUNT               = MXU_ENABLE ? MXU_COUNT : 0;
+    localparam int unsigned TARGET_VLD_READY               = SHELL_VLD_READY;
+    localparam int unsigned TARGET_XLU_REDUCE_TREES        = XLU_REDUCE_TREES;
+    localparam bit          TARGET_XLU_QUANTIZE            = XLU_QUANTIZE;
+    localparam bit          TARGET_PERF_COUNTERS           = PERF_COUNTERS;
+
+    localparam int unsigned LAST_DMA_LANE                  = (LANES < CHANNELS ? LANES : CHANNELS) - 1;
+    localparam int unsigned DMA_TIMING_READ_OVERLAP        = 2;
+    localparam int unsigned DMA_TIMING_ACCEPT_CYCLES       = 3;
+    localparam int unsigned DMA_TIMING_NEXT_AFTER_DONE     = 2;
+    localparam int unsigned DMA_TIMING_WAIT_CYCLES         = 1;
+    localparam int unsigned DMA_TIMING_WORD_CYCLES         = 2;
+    localparam int unsigned DMA_TIMING_READ_CYCLES         = 35 + 2 * LAST_DMA_LANE + int'(VMEM_URAM_OREG);
+    localparam int unsigned DMA_TIMING_WRITE_CYCLES        = 50 + 2 * LAST_DMA_LANE + 2 * int'(VMEM_URAM_OREG);
+    localparam int unsigned DMA_TIMING_UNLANED_READ_CYCLES = LANES < CHANNELS ? 16 + 2 * (CHANNELS - 1) : 0;
+    localparam int unsigned DMA_TIMING_UNLANED_WORD_CYCLES = 1;
 
     for (genvar engine = 0; engine < MXU_COUNT; engine++) begin : gen_mxu
         if (MXU_ENABLE) begin : gen_enabled
@@ -916,7 +929,6 @@ module tpu #(
 
             localparam int unsigned A_WORD_ROWS = MXU_BEATS ? MXU_BEAT_BITS / MXU_CODE_BITS : MXU_WORD_ROWS;
             logic [MXU_CODE_BITS*A_WORD_ROWS-1:0] a_word [LANES];
-            // Only an output-stationary unit uses its reset (it flushes its PEs).
             logic rst_mxu;
             if (MXU_DATAFLOW[1]) begin : gen_rst
                 reset_register u_rst_mxu (.clk, .rst_in(rst), .rst(rst_mxu));
@@ -986,7 +998,6 @@ module tpu #(
                 assign a_data[lane]  = matmul_data[lane][engine];
                 assign a_scale[lane] = matmul_scale[lane][engine];
                 if ((MXU_SLR_CROSSING >> engine) & 1) begin : gen_crossing
-                    // Sublanes s and s + N_A carry the same row: it crosses once.
                     localparam int unsigned CROSS_ROWS = SUBLANES % MXU_N_A == 0 ? MXU_N_A : SUBLANES;
                     localparam int unsigned RESULT_W   = SUBLANES + CROSS_ROWS*VECTOR_ELEMENT_WIDTH;
                     logic [RESULT_W-1:0] result_in, result_tx, result_rx;

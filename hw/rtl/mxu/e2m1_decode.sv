@@ -3,6 +3,8 @@ module e2m1_decode (
     input  logic [3:0]        code,
     output logic signed [4:0] value
 );
+    localparam string ARITH_CODES = "e2m1";
+
     logic [3:0] magnitude;
 
     always_comb begin

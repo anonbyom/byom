@@ -13,6 +13,7 @@ PINS = {"GEMMINI_SRC": ("https://github.com/ucb-bar/gemmini", "8c3f9923"),
 
 MESH = ("dim", "tile", "tile_latency", "output_delay", "input_width", "output_width", "acc_width")  # MeshConfig's
 SOCKET = ("matmul_queue_depth", "row_queue_depth")
+DATAFLOWS = ("ws", "os", "both")                    # MXU_DATAFLOW 1, 2, 3
 
 # meshes/<mesh>_cfg.sv, from the generator's params.json
 CFG = """\
@@ -34,9 +35,6 @@ endpackage : gemmini_mesh_cfg
 # units/<unit>.toml
 UNIT = """\
 # Written by: python3 examples/gemmini/generate.py {command}
-level = "unit"
-family = "gemmini"
-dataflow = "{dataflow}"
 # sources: the mesh, from Gemmini's generator; adapter: BYOM's side
 sources = ["examples/gemmini/meshes/{name}_cfg.sv", "examples/gemmini/meshes/{name}.v"]
 adapter = ["examples/gemmini/adapter.sv"]
@@ -45,32 +43,13 @@ adapter = ["examples/gemmini/adapter.sv"]
 code_bits = {input_width}
 w_bits = {input_width}
 a_bits = {input_width}
-product_bits = {product_width}
-sum_bits = {output_width}
+prod_w = {product_width}
+psum_w = {output_width}
 w_twos = true
-push_natural = false
-n_a = 1
 
 [socket]
+dataflow = {dataflow_bits}              # 1 weight-stationary, 2 output-stationary, 3 both
 {socket}
-
-[arith]
-mxu_operands = "int{input_width}"
-
-[arith.mxu_arith]
-kind = "int"
-w_bits = {input_width}
-a_bits = {input_width}
-n_w = 1
-n_a = 1
-full_neg = true
-sum_bits = {output_width}
-
-[arith.gemmini]
-dataflow = "{dataflow}"
-dim = {dim}
-tile = {tile}
-output_width = {output_width}
 """
 
 def strip_locators(verilog): return re.sub(r"[ \t]*// @\[[^\]]*\]$", "", verilog, flags=re.M)
@@ -95,7 +74,7 @@ def sources():
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("unit", help="the unit file to write: units/UNIT.toml")
-    ap.add_argument("--dataflow", choices=("ws", "os", "both"), required=True)
+    ap.add_argument("--dataflow", choices=DATAFLOWS, required=True)
     for k in MESH:
         ap.add_argument("--" + k.replace("_", "-"), type=int, help="a Mesh setting")
     for k in SOCKET:
@@ -110,9 +89,9 @@ if __name__ == "__main__":
     p = json.loads((d / "params.json").read_text())
     socket = {"mode_word": True} if a["dataflow"] == "both" else {}     # both: the run's dataflow is bit 0 of mxu_mode
     socket |= {k: a[k] for k in SOCKET if a[k] is not None}
-    unit = UNIT.format(**p, product_width=2 * p["input_width"], command=" ".join(sys.argv[1:]),
-                       socket="\n".join(f"{k} = {str(v).lower()}" for k, v in socket.items()))
+    unit = UNIT.format(**p, product_width=2 * p["input_width"], dataflow_bits=DATAFLOWS.index(a["dataflow"]) + 1,
+       command=" ".join(sys.argv[1:]), socket="\n".join(f"{k} = {str(v).lower()}" for k, v in socket.items()))
     for f, text in ((MESHES / f"{p['name']}.v", prefix_modules(strip_locators((d / "FlatMesh.v").read_text()))),
-                    (MESHES / f"{p['name']}_cfg.sv", CFG.format(**p)), (HERE / "units" / f"{a['unit']}.toml", unit)):
+        (MESHES / f"{p['name']}_cfg.sv", CFG.format(**p)), (HERE / "units" / f"{a['unit']}.toml", unit)):
         f.write_text(text)
         print("wrote", f.relative_to(HERE))

@@ -74,6 +74,7 @@ module mxu
     parameter int unsigned  W_CODES           = 1,
     parameter bit           TILE_MODES        = 1'b0,
     parameter bit           BANK_FREE_AT_LOAD = 1'b0,
+    parameter int unsigned  A_WORD_ROWS       = N_A,     // a MATMUL word's rows (vector_mxu's); unused
     parameter int unsigned  DATAFLOW          = 1,
     parameter int unsigned  B_QUEUE_DEPTH     = 64,
     parameter int unsigned  FLUSH_WAIT        = 4,
@@ -124,10 +125,19 @@ module mxu
                W_BITS, A_BITS, PROD_W, PSUM_W, IN_W, gemmini_mesh_cfg::OUTPUT_WIDTH);
     end
 
-    // The socket's timing for the integration flow
-    localparam int unsigned SOCKET_TILE        = gemmini_mesh_cfg::TILE;
-    localparam int unsigned SOCKET_IN_FLIGHT   = MATMULS;
-    localparam int unsigned SOCKET_MATMUL_FREE = 0;
+    // This unit's socket terms where they differ from vector_mxu.sv's defaults
+    localparam string       SOCKET_LEVEL     = "unit";
+    localparam string       SOCKET_FAMILY    = "gemmini";
+    localparam int unsigned SOCKET_TILE      = gemmini_mesh_cfg::TILE;
+    localparam int unsigned SOCKET_IN_FLIGHT = MATMULS;
+    localparam string       TARGET_MXU_OPERANDS = "int8";
+    localparam string       ARITH_KIND          = "int";
+    localparam int unsigned ARITH_W_BITS        = IN_W;
+    localparam int unsigned ARITH_A_BITS        = IN_W;
+    localparam int unsigned ARITH_N_W           = 1;
+    localparam int unsigned ARITH_N_A           = 1;
+    localparam bit          ARITH_FULL_NEG      = 1'b1;
+    localparam int unsigned ARITH_SUM_BITS      = OUT_W;
 
     fire_t           fire   [DIM];
     result_t         result [DIM];
@@ -405,18 +415,14 @@ module gemmini_ws
     input  logic                  room,
     input  result_t               result        [DIM]
 );
-    localparam int unsigned REQUEST_ROWS           = 4;
-    localparam int unsigned SOCKET_SCHEDULE        = REQUEST_ROWS - 1;
-    localparam int unsigned SOCKET_OUTPUT          = ACC_ENABLE ? 7 : 2;     // mxu_output's: accumulating, or straight to BF16
-    localparam int unsigned SOCKET_RESULT_DELAY    = SOCKET_SCHEDULE + MESH_LATENCY + SOCKET_OUTPUT;
-    localparam int unsigned SOCKET_FEED_ROWS       = DIM;
-    localparam bit          SOCKET_FEED_AT_COMMAND = 1'b1;
-    localparam int unsigned SOCKET_FEED_START      = 2;
-    localparam int unsigned SOCKET_PRELOAD_LAUNCH  = SOCKET_FEED_START + SOCKET_FEED_ROWS;
-    localparam bit          SOCKET_WEIGHT_STREAM   = 1'b0;
-    localparam int unsigned SOCKET_WEIGHT_READY    = DIM - 1 + 3;
-    localparam int unsigned SOCKET_BANK_FREE       = DIM;
-    localparam int unsigned SOCKET_TILE_SPACING    = DIM;
+    localparam int unsigned REQUEST_ROWS          = 4;
+    localparam int unsigned OUTPUT_DELAY          = ACC_ENABLE ? 7 : 2;     // mxu_output's: accumulating, or straight to BF16
+    localparam int unsigned SOCKET_SCHEDULE       = REQUEST_ROWS - 1;
+    localparam int unsigned SOCKET_RESULT_DELAY   = SOCKET_SCHEDULE + MESH_LATENCY + OUTPUT_DELAY;
+    localparam int unsigned SOCKET_FEED_START     = 2;
+    localparam int unsigned SOCKET_PRELOAD_LAUNCH = SOCKET_FEED_START + DIM;
+    localparam bit          SOCKET_WEIGHT_STREAM  = 1'b0;
+    localparam int unsigned SOCKET_WEIGHT_READY   = DIM - 1 + 3;
 
     logic                matmul_accept;
     logic [TAG_W-1:0]    tag_data;
@@ -795,13 +801,8 @@ module gemmini_os
 );
     localparam logic [1:0] FIRST = 2'd1, LAST = 2'd3;
 
-    localparam int unsigned SOCKET_OS_BEAT                 = 0;
-    localparam int unsigned SOCKET_OS_PAIR_CYCLES          = WORD_ROWS;
-    localparam int unsigned SOCKET_OS_FREE                 = 0;
-    localparam int unsigned SOCKET_OS_DRAIN_NEXT           = 1;
-    localparam int unsigned SOCKET_OS_DRAIN_FLUSH          = 1 + FLUSH_WAIT;
-    localparam int unsigned SOCKET_OS_DRAIN                = MESH_LATENCY + 1 + OUTPUT_REG;
-    localparam int unsigned SOCKET_OS_DRAIN_ROWS_PER_CYCLE = 1;
+    localparam int unsigned SOCKET_OS_DRAIN_FLUSH = 1 + FLUSH_WAIT;
+    localparam int unsigned SOCKET_OS_DRAIN       = MESH_LATENCY + 1 + OUTPUT_REG;
 
     logic [IN_W-1:0] b_head [DIM];
     logic            b_head_valid [DIM];

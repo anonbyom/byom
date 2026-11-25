@@ -87,6 +87,9 @@ module scalar_unit #(
 );
     import isa_pkg::*;
 
+    localparam int unsigned TARGET_DMA_QUEUE = DMA_QUEUE_DEPTH;    // the description's dma_queue and dma.queue
+    localparam int unsigned DMA_TIMING_QUEUE = DMA_QUEUE_DEPTH;
+
     logic                               imem_dma_write_valid;
     logic         [IMEM_ADDR_WIDTH-1:0] imem_dma_write_addr;
     bundle_t                            imem_dma_write_data;

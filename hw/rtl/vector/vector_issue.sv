@@ -23,7 +23,6 @@ module vector_issue #(
 ) (
     input  logic                    clk,
     input  logic                    rst,
-    // Output-stationary MXU: no MATMUL, only MATMUL_PRELOAD
     input  logic                    mxu_os,
     input  logic                    valu_valid,
     input  isa_pkg::valu_opcode_t   valu_op,
@@ -96,6 +95,7 @@ module vector_issue #(
     localparam int unsigned XLU_EXIT_QUANT_T = 22;
     localparam int unsigned XLU_EXIT_TILE   = 3;
     localparam int unsigned XLU_POOL        = 15 + 8;    // XLU results in flight + the tile's 8
+    localparam int unsigned TARGET_XLU_DEPTH = XLU_POOL - 8;   // the description's xlu_depth
     logic [5:0]             xlu_free_from_q;
     localparam int unsigned TREE_W = XLU_REDUCE_TREES > 1 ? $clog2(XLU_REDUCE_TREES) : 1;
     logic [1:0]             reduce_busy_q [XLU_REDUCE_TREES];
@@ -159,7 +159,6 @@ module vector_issue #(
         .q  (returned)
     );
 
-    // The MATMUL's accumulator mode: a preload's own, else the engine's last.
     acc_mode_t issue_acc_mode_q [MXU_COUNT];
     acc_mode_t matmul_acc_mode;
     logic      matmul_produces;
@@ -261,7 +260,6 @@ module vector_issue #(
         (vex_op inside {TRANSPOSE_START, TRANSPOSE_CONTINUE, TRANSPOSE_END} || xlu_issue);
     assign pop_fire        = ready && pop_valid;
 
-    // VALU result FIFOs: free slots and results ready, for ADD/MUL, the EUP and the in-lane quantizer.
     credit_counter #(
         .WIDTH(FP_W),
         .INIT(FP_DEPTH)
@@ -329,7 +327,6 @@ module vector_issue #(
         else if (eup_busy_q != 0) eup_busy_q <= eup_busy_q - 1'b1;
     end
 
-    // XLU state: tile fill, result exit order, reduce trees, quantize groups.
     logic reduce_fire;
     logic quant_fire;
     assign reduce_fire = xlu_fire && !quant_issue;

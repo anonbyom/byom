@@ -13,7 +13,6 @@ package isa_pkg;
     localparam int unsigned VEX_SLOT_WIDTH           = 16;
     localparam int unsigned VR_SLOT_WIDTH            = 10;
     localparam int unsigned IMM_SLOT_WIDTH           = 20;
-    // VALU2: a second VALU (BF16 ADD/MUL) in a 32-bit bundle word after bit 128.
 `ifdef VALU2
     localparam bit          VALU2                    = 1'b1;
 `else
@@ -21,11 +20,12 @@ package isa_pkg;
 `endif
     localparam int unsigned VALU2_SLOT_WIDTH         = 18;
     localparam int unsigned VALU2_SLOT_OFFSET        = 128;
-    // After the VALU2 slot: each VALU's y source (1: the immediate's low 16 bits), then VALU1's opcode bit 5.
     localparam int unsigned VALU1_Y_IMM_BIT          = VALU2_SLOT_OFFSET + VALU2_SLOT_WIDTH;
     localparam int unsigned VALU2_Y_IMM_BIT          = VALU1_Y_IMM_BIT + 1;
     localparam int unsigned VALU1_OPCODE_HI_BIT      = VALU2_Y_IMM_BIT + 1;
     localparam int unsigned BUNDLE_WIDTH             = 128 + 32 * int'(VALU2);
+    localparam int unsigned TARGET_BUNDLE_BITS       = BUNDLE_WIDTH;    // the compiler's description's
+    localparam bit          TARGET_VALU2             = VALU2;
 
     localparam int unsigned SCALAR_SLOT_OFFSET       = 0;
     localparam int unsigned VALU_SLOT_OFFSET         = SCALAR_SLOT_OFFSET + SCALAR_SLOT_WIDTH;
@@ -99,7 +99,7 @@ package isa_pkg;
         VQUANT_START    = 6'h1d,
         VQUANT_CONTINUE = 6'h1e,
         VQUANT_END      = 6'h1f,
-        // VALU2 bundles only (opcode bit 5); decoded to the base unit's op (bundle_decode).
+        // VALU2 bundles only
         SUB_BF16        = 6'h20,
         VAND            = 6'h21,
         VXOR            = 6'h22
@@ -156,7 +156,7 @@ package isa_pkg;
     } acc_mode_t;
 
     typedef struct packed {
-        logic [1:0] tile_mode;  // the preload's sreg[1:0] (MXU_TILE_MODES), kept by the engine's MATMULs
+        logic [1:0] tile_mode;
         acc_mode_t  acc_mode;
         logic       bank;
         logic       preload;

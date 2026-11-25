@@ -39,6 +39,9 @@ module pe #(
     output logic [N_W*N_A*P_BITS-1:0]    p,
     output logic [N_W*N_A*P_BITS-1:0]    pcout
 );
+    localparam string SOCKET_LEVEL  = "arithmetic";
+    localparam string SOCKET_FAMILY = "fabric";
+
     logic [N_A*A_BITS-1:0]       a_q        [N_W+1];
     logic                        b_update_q [N_W+1];
     logic [B_BITS-1:0]           weight     [N_W];

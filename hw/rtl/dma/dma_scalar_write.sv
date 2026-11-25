@@ -36,6 +36,8 @@ module dma_scalar_write #(
     output logic [SMEM_ADDR_W-1:0] smem_addr,
     output logic [SCALAR_W-1:0]    smem_data
 );
+    localparam int unsigned DMA_TIMING_IMEM_WORD_CYCLES = IMEM_WORDS;   // a DMA word into IMEM, a packet a cycle
+
     logic                inject           [CHANNELS];
     logic                beat_done        [CHANNELS];
     logic [PACKET_W-1:0] data             [CHANNELS];

@@ -1,5 +1,5 @@
 // A two's complement code saturated to BITS-bit two's complement or sign-magnitude.
-module int4_int_code #(
+module int_code #(
     parameter int unsigned  BITS    = 4,
     parameter bit           TWOS    = 1'b1,
     parameter int unsigned  IN_BITS = 4,
@@ -19,4 +19,4 @@ module int4_int_code #(
     end else begin : gen_sign_magnitude
         assign code = {int4[IN_BITS-1], magnitude[BITS-2:0]};
     end
-endmodule : int4_int_code
+endmodule : int_code
